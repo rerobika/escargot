@@ -576,45 +576,38 @@ public:
     }
 
     template <typename T>
+    PassRefPtr<T> finalizeSpecial(MetaNode meta, T* node)
+    {
+        switch (node->type()) {
+            case CallExpression: {
+                CallExpressionNode* c = (CallExpressionNode*)node;
+                if (c->callee() && c->callee()->isIdentifier() && ((IdentifierNode*)c->callee())->name() == this->escargotContext->staticStrings().eval) {
+                    scopeContexts.back()->m_hasEval = true;
+                    if (this->context->inArrowFunction) {
+                        insertUsingName(this->escargotContext->staticStrings().stringThis);
+                    }
+                }
+                break;
+            } case WithStatement: {
+                scopeContexts.back()->m_hasWith = true;
+                break;
+            } case YieldExpression: {
+                scopeContexts.back()->m_hasYield = true;
+                break;
+            } default : {
+                ASSERT (node->type() == CatchClause);
+                scopeContexts.back()->m_hasCatch = true;
+            }
+        }
+
+        node->m_loc = NodeLOC(meta.index);
+        return adoptRef(node);
+    }
+
+    template <typename T>
     PassRefPtr<T> finalize(MetaNode meta, T* node)
     {
-        /*
-        if (this->config.range) {
-            node.range = [meta.index, this->lastMarker.index];
-        }
-
-        if (this->config.loc) {
-            node.loc = {
-                start: {
-                    line: meta.line,
-                    column: meta.column
-                },
-                end: {
-                    line: this->lastMarker.lineNumber,
-                    column: this->lastMarker.index - this->lastMarker.lineStart
-                }
-            };
-            if (this->config.source) {
-                node.loc.source = this->config.source;
-            }
-        }*/
-        auto type = node->type();
-        if (type == CallExpression) {
-            CallExpressionNode* c = (CallExpressionNode*)node;
-            if (c->callee() && c->callee()->isIdentifier() && ((IdentifierNode*)c->callee())->name() == this->escargotContext->staticStrings().eval) {
-                scopeContexts.back()->m_hasEval = true;
-                if (this->context->inArrowFunction) {
-                    insertUsingName(this->escargotContext->staticStrings().stringThis);
-                }
-            }
-        } else if (type == WithStatement) {
-            scopeContexts.back()->m_hasWith = true;
-        } else if (type == YieldExpression) {
-            scopeContexts.back()->m_hasYield = true;
-        } else if (type == CatchClause) {
-            scopeContexts.back()->m_hasCatch = true;
-        }
-
+        ASSERT (node->type() != CallExpression && node->type() != WithStatement && node->type() != YieldExpression && node->type() != CatchClause);
         node->m_loc = NodeLOC(meta.index);
         return adoptRef(node);
     }
@@ -2541,7 +2534,7 @@ public:
                 } else if (this->lookahead->valuePunctuatorKind == LeftParenthesis) {
                     this->context->isBindingElement = false;
                     this->context->isAssignmentTarget = false;
-                    expr = this->finalize(this->startNode(startToken), new CallExpressionNode(expr.get(), this->parseArguments()));
+                    expr = this->finalizeSpecial(this->startNode(startToken), new CallExpressionNode(expr.get(), this->parseArguments()));
                 } else if (this->lookahead->valuePunctuatorKind == LeftSquareBracket) {
                     this->context->isBindingElement = false;
                     this->context->isAssignmentTarget = true;
@@ -2765,7 +2758,7 @@ public:
         for (size_t i = 0; i < templateLiteral->expressions().size(); i++) {
             args.push_back(templateLiteral->expressions()[i]);
         }
-        return this->finalize(node, new CallExpressionNode(taggedTemplateExpression->expr(), std::move(args)));
+        return this->finalizeSpecial(node, new CallExpressionNode(taggedTemplateExpression->expr(), std::move(args)));
     }
 
     // ECMA-262 12.4 Update Expressions
@@ -5147,7 +5140,7 @@ public:
             this->context->labelSet[i].second--;
         }
 
-        return this->finalize(node, new WithStatementNode(object, body.get()));
+        return this->finalizeSpecial(node, new WithStatementNode(object, body.get()));
     }
 
     // ECMA-262 13.12 The switch statement
@@ -5408,7 +5401,7 @@ public:
 
         this->context->functionDeclarationsInDirectCatchScope = std::move(vecBefore);
 
-        return this->finalize(node, new CatchClauseNode(param.get(), nullptr, body.get(), vec));
+        return this->finalizeSpecial(node, new CatchClauseNode(param.get(), nullptr, body.get(), vec));
     }
 
     void scanCatchClause()
