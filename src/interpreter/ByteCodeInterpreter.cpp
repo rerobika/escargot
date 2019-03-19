@@ -83,9 +83,32 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
     goto*(((ByteCode*)programCounter)->m_opcodeInAddress);
 #define JUMP_INSTRUCTION(opcode) \
     goto opcode##OpcodeLbl;
+#define JUMP_LOOKAHEAD(relation)                                                  \
+    do {                                                                          \
+        Opcode opcode = *(Opcode*)((ByteCode*)programCounter)->m_opcodeInAddress; \
+        if (LIKELY(opcode == Opcode::JumpIfFalseOpcode)) {                        \
+            JumpIfFalse* code = (JumpIfFalse*)programCounter;                     \
+            if (UNLIKELY(relation)) {                                             \
+                ADD_PROGRAM_COUNTER(JumpIfFalse);                                 \
+            } else {                                                              \
+                programCounter = code->m_jumpPosition;                            \
+            }                                                                     \
+        } else if (LIKELY(opcode == Opcode::JumpIfTrueOpcode)) {                  \
+            JumpIfTrue* code = (JumpIfTrue*)programCounter;                       \
+            if (LIKELY(relation)) {                                               \
+                programCounter = code->m_jumpPosition;                            \
+            } else {                                                              \
+                ADD_PROGRAM_COUNTER(JumpIfFalse);                                 \
+            }                                                                     \
+        } else {                                                                  \
+            registerFile[code->m_dstIndex] = Value((relation));                   \
+        }                                                                         \
+    } while (0)
 
             /* Execute first instruction. */
             NEXT_INSTRUCTION();
+
+
 #else
 
 #define DEFINE_OPCODE(codeName) case codeName##Opcode
@@ -98,6 +121,7 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
 #define JUMP_INSTRUCTION(opcode)    \
     currentOpcode = opcode##Opcode; \
     goto NextInstructionWithoutFetchOpcode;
+#define JUMP_LOOKAHEAD(relation)
 
         NextInstruction:
             Opcode currentOpcode = ((ByteCode*)programCounter)->m_opcode;
@@ -301,8 +325,9 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 BinaryLessThan* code = (BinaryLessThan*)programCounter;
                 const Value& left = registerFile[code->m_srcIndex0];
                 const Value& right = registerFile[code->m_srcIndex1];
-                registerFile[code->m_dstIndex] = Value(abstractRelationalComparison(state, left, right, true));
+                bool isLessEqual = abstractRelationalComparison(state, left, right, true);
                 ADD_PROGRAM_COUNTER(BinaryLessThan);
+                JUMP_LOOKAHEAD(isLessEqual);
                 NEXT_INSTRUCTION();
             }
 
@@ -312,8 +337,9 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 BinaryLessThanOrEqual* code = (BinaryLessThanOrEqual*)programCounter;
                 const Value& left = registerFile[code->m_srcIndex0];
                 const Value& right = registerFile[code->m_srcIndex1];
-                registerFile[code->m_dstIndex] = Value(abstractRelationalComparisonOrEqual(state, left, right, true));
+                bool isLessEqual = abstractRelationalComparisonOrEqual(state, left, right, true);
                 ADD_PROGRAM_COUNTER(BinaryLessThanOrEqual);
+                JUMP_LOOKAHEAD(isLessEqual);
                 NEXT_INSTRUCTION();
             }
 
@@ -323,8 +349,9 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 BinaryGreaterThan* code = (BinaryGreaterThan*)programCounter;
                 const Value& left = registerFile[code->m_srcIndex0];
                 const Value& right = registerFile[code->m_srcIndex1];
-                registerFile[code->m_dstIndex] = Value(abstractRelationalComparison(state, right, left, false));
+                bool isGreater = abstractRelationalComparison(state, right, left, false);
                 ADD_PROGRAM_COUNTER(BinaryGreaterThan);
+                JUMP_LOOKAHEAD(isGreater);
                 NEXT_INSTRUCTION();
             }
 
@@ -334,8 +361,9 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 BinaryGreaterThanOrEqual* code = (BinaryGreaterThanOrEqual*)programCounter;
                 const Value& left = registerFile[code->m_srcIndex0];
                 const Value& right = registerFile[code->m_srcIndex1];
-                registerFile[code->m_dstIndex] = Value(abstractRelationalComparisonOrEqual(state, right, left, false));
+                bool isGreaterEqual = abstractRelationalComparisonOrEqual(state, right, left, false);
                 ADD_PROGRAM_COUNTER(BinaryGreaterThanOrEqual);
+                JUMP_LOOKAHEAD(isGreaterEqual);
                 NEXT_INSTRUCTION();
             }
 
