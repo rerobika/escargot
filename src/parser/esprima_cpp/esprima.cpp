@@ -788,7 +788,7 @@ public:
     }
 
     template <typename T>
-    PassRefPtr<Node> isolateCoverGrammar(T parseFunction)
+    ALWAYS_INLINE PassRefPtr<Node> isolateCoverGrammar(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
@@ -812,7 +812,7 @@ public:
     }
 
     template <typename T>
-    ScanExpressionResult scanIsolateCoverGrammar(T parseFunction)
+    ALWAYS_INLINE ScanExpressionResult scanIsolateCoverGrammar(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
@@ -836,7 +836,7 @@ public:
     }
 
     template <typename T>
-    PassRefPtr<Node> isolateCoverGrammarWithFunctor(T parseFunction)
+    ALWAYS_INLINE PassRefPtr<Node> isolateCoverGrammarWithFunctor(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
@@ -860,7 +860,7 @@ public:
     }
 
     template <typename T>
-    void scanIsolateCoverGrammarWithFunctor(T parseFunction)
+    ALWAYS_INLINE void scanIsolateCoverGrammarWithFunctor(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
@@ -882,7 +882,7 @@ public:
     }
 
     template <typename T>
-    PassRefPtr<Node> inheritCoverGrammar(T parseFunction)
+    ALWAYS_INLINE PassRefPtr<Node> inheritCoverGrammar(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
@@ -904,7 +904,7 @@ public:
     }
 
     template <typename T>
-    ScanExpressionResult scanInheritCoverGrammar(T parseFunction)
+    ALWAYS_INLINE ScanExpressionResult scanInheritCoverGrammar(T parseFunction)
     {
         const bool previousIsBindingElement = this->context->isBindingElement;
         const bool previousIsAssignmentTarget = this->context->isAssignmentTarget;
