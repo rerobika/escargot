@@ -39,6 +39,23 @@ class FunctionObject : public Object {
     FunctionObject(ExecutionState& state, CodeBlock* codeBlock, ForGlobalBuiltin);
 
 public:
+    enum ThisMode {
+        Lexical,
+        Strict,
+        Global,
+    };
+
+    enum ConstructorKind {
+        Derived,
+        Base,
+    };
+
+    enum FunctionKind {
+        Normal,
+        ClassConstructor,
+        Generator
+    };
+
     FunctionObject(ExecutionState& state, NativeFunctionInfo info);
     FunctionObject(ExecutionState& state, CodeBlock* codeBlock, LexicalEnvironment* outerEnvironment);
     enum ForBind { __ForBind__ };
@@ -97,6 +114,46 @@ public:
         return m_codeBlock;
     }
 
+    Object* homeObject()
+    {
+        return m_homeObject;
+    }
+
+    ThisMode thisMode()
+    {
+        if (isArrowFunction()) {
+            return ThisMode::Lexical;
+        } else if (m_codeBlock->isStrict()) {
+            return ThisMode::Strict;
+        } else {
+            return ThisMode::Global;
+        }
+    }
+
+    ConstructorKind constructorKind()
+    {
+        return m_constructorKind;
+    }
+
+    void setConstructorKind(ConstructorKind kind)
+    {
+        m_constructorKind = kind;
+    }
+
+    FunctionKind functionKind()
+    {
+        if (isClassConstructor()) {
+            return FunctionKind::ClassConstructor;
+        }
+        /* TODO:
+        else if (isGenerator()) {
+            return FunctionKind::Generator;
+        }
+        */
+
+        return FunctionKind::Normal;
+    }
+
     Value call(ExecutionState& state, const Value& receiver, const size_t argc, Value* argv)
     {
         return processCall(state, receiver, argc, argv, false);
@@ -120,6 +177,11 @@ public:
     }
 
     bool hasInstance(ExecutionState& state, const Value& O);
+
+    void setHomeObject(Object* homeObject)
+    {
+        m_homeObject = homeObject;
+    }
 
 private:
     LexicalEnvironment* outerEnvironment()
@@ -146,6 +208,8 @@ private:
     void generateBytecodeBlock(ExecutionState& state);
     CodeBlock* m_codeBlock;
     LexicalEnvironment* m_outerEnvironment;
+    Object* m_homeObject;
+    ConstructorKind m_constructorKind;
 };
 }
 

@@ -40,17 +40,6 @@
 
 namespace Escargot {
 
-
-static Value implicitClassConstructor(ExecutionState& state, Value thisValue, size_t argc, Value* argv, bool isNewExpression)
-{
-    return Value();
-}
-
-static Object* implicitClassConstructorCtor(ExecutionState& state, CodeBlock* codeBlock, size_t argc, Value* argv)
-{
-    return new Object(state);
-}
-
 #define ADD_PROGRAM_COUNTER(CodeType) programCounter += sizeof(CodeType);
 
 ALWAYS_INLINE size_t jumpTo(char* codeBuffer, const size_t jumpPosition)
@@ -870,12 +859,37 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 NEXT_INSTRUCTION();
             }
 
-            DEFINE_OPCODE(CreateImplicitConstructor)
+            DEFINE_OPCODE(CreateClass)
                 :
             {
-                CreateImplicitConstructor* code = (CreateImplicitConstructor*)programCounter;
-                registerFile[code->m_registerIndex] = new FunctionObject(state, NativeFunctionInfo(::Escargot::AtomicString::fromPayload(String::emptyString), implicitClassConstructor, 1, implicitClassConstructorCtor, NativeFunctionInfo::Flags::Strict | NativeFunctionInfo::Flags::Constructor | NativeFunctionInfo::Flags::ClassConstructor));
-                ADD_PROGRAM_COUNTER(CreateImplicitConstructor);
+                CreateClass* code = (CreateClass*)programCounter;
+                classOperation(state, code, ec, registerFile);
+                ADD_PROGRAM_COUNTER(CreateClass);
+                NEXT_INSTRUCTION();
+            }
+
+            DEFINE_OPCODE(SuperReference)
+                :
+            {
+                SuperReference* code = (SuperReference*)programCounter;
+                superOperation(state, code, ec, registerFile);
+                ADD_PROGRAM_COUNTER(SuperReference);
+                NEXT_INSTRUCTION();
+            }
+
+            DEFINE_OPCODE(LoadThisBinding)
+                :
+            {
+                LoadThisBinding* code = (LoadThisBinding*)programCounter;
+                EnvironmentRecord* envRec = ec->getThisEnvironment();
+                ASSERT(envRec->isDeclarativeEnvironmentRecord() && envRec->asDeclarativeEnvironmentRecord()->isFunctionEnvironmentRecord());
+
+                if (code->m_dstIndex != std::numeric_limits<ByteCodeRegisterIndex>::max()) {
+                    registerFile[code->m_dstIndex] = envRec->asDeclarativeEnvironmentRecord()->asFunctionEnvironmentRecord()->getThisBinding(state);
+                } else {
+                    registerFile[byteCodeBlock->m_requiredRegisterFileSizeInValueSize] = envRec->asDeclarativeEnvironmentRecord()->asFunctionEnvironmentRecord()->getThisBinding(state);
+                }
+                ADD_PROGRAM_COUNTER(LoadThisBinding);
                 NEXT_INSTRUCTION();
             }
 
@@ -1150,6 +1164,11 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
             DEFINE_DEFAULT
 
         } catch (const Value& v) {
+            if (ec->isOnGoingClassConstruction()) {
+                ec->setOnGoingClassConstruction(false);
+                ec->m_lexicalEnvironment = ec->lexicalEnvironment()->outerEnvironment();
+            }
+
             if (byteCodeBlock->m_codeBlock->isInterpretedCodeBlock() && byteCodeBlock->m_codeBlock->asInterpretedCodeBlock()->byteCodeBlock() == nullptr) {
                 byteCodeBlock->m_codeBlock->asInterpretedCodeBlock()->m_byteCodeBlock = byteCodeBlock;
             }
@@ -1979,6 +1998,127 @@ NEVER_INLINE void ByteCodeInterpreter::evalOperation(ExecutionState& state, Call
     }
 }
 
+NEVER_INLINE void ByteCodeInterpreter::classOperation(ExecutionState& state, CreateClass* code, ExecutionContext* ec, Value* registerFile)
+{
+    // 14.5.14
+    if (code->m_stage == 1) {
+        DeclarativeEnvironmentRecordNotIndexed* classScopeEnvRec = new DeclarativeEnvironmentRecordNotIndexed();
+        LexicalEnvironment* classScope = new LexicalEnvironment(classScopeEnvRec, ec->lexicalEnvironment());
+
+        if (code->m_name.string()->length()) {
+            classScopeEnvRec->createBinding(state, code->m_name, false, true);
+        }
+
+        ec->m_lexicalEnvironment = classScope;
+
+        return;
+    }
+
+    if (code->m_stage == 3) {
+        ec->setOnGoingClassConstruction(false);
+        LexicalEnvironment* classScope = ec->lexicalEnvironment();
+        LexicalEnvironment* lex = classScope->outerEnvironment();
+
+        if (code->m_name.string()->length()) {
+            classScope->record()->initializeBinding(state, code->m_name, registerFile[code->m_classRegisterIndex]);
+        }
+
+        ec->m_lexicalEnvironment = lex;
+
+        return;
+    }
+
+
+    LexicalEnvironment* classScope = ec->lexicalEnvironment();
+    LexicalEnvironment* lex = classScope->outerEnvironment();
+
+    ec->m_lexicalEnvironment = lex;
+
+    Value protoParent;
+    Value constructorParent;
+
+    bool heritagePresent = code->m_superClassRegisterIndex != std::numeric_limits<ByteCodeRegisterIndex>::max();
+
+    // 5.
+    if (!heritagePresent) {
+        // 5.a
+        protoParent = state.context()->globalObject()->objectPrototype();
+        // 5.b
+        constructorParent = state.context()->globalObject()->functionPrototype();
+
+    } else {
+        // 5.a-c
+        const Value& superClass = registerFile[code->m_superClassRegisterIndex];
+
+        if (superClass.isNull()) {
+            protoParent = Value(Value::Null);
+            constructorParent = state.context()->globalObject()->functionPrototype();
+        } else if (!superClass.isObject() || !superClass.asObject()->isFunctionObject() || !superClass.asObject()->asFunctionObject()->isConstructor()) {
+            ErrorObject::throwBuiltinError(state, ErrorObject::TypeError, errorMessage_Class_Extends_Value_Is_Not_Object_Nor_Null);
+        } else {
+            // TODO: throw TypeError superClass is when generator function
+            protoParent = superClass.asObject()->get(state, ObjectPropertyName(state.context()->staticStrings().prototype)).value(state, Value());
+
+            if (!protoParent.isObject() && !protoParent.isNull()) {
+                ErrorObject::throwBuiltinError(state, ErrorObject::TypeError, errorMessage_Class_Prototype_Is_Not_Object_Nor_Null);
+            }
+
+            constructorParent = superClass;
+        }
+    }
+
+    Object* proto = new Object(state);
+    proto->setPrototype(state, protoParent);
+
+    ec->m_lexicalEnvironment = classScope;
+
+    Object* constructor;
+
+    if (code->m_codeBlock) {
+        constructor = new FunctionObject(state, code->m_codeBlock, ec->lexicalEnvironment());
+    } else {
+        if (!heritagePresent) {
+            Value argv[] = { String::emptyString, String::emptyString };
+            constructor = newOperation(state, state.context()->globalObject()->function(), 2, argv);
+        } else {
+            Value argv[] = { new ASCIIString("...args"), new ASCIIString("super(...args)") };
+            constructor = newOperation(state, state.context()->globalObject()->function(), 2, argv);
+        }
+    }
+
+    constructor->setPrototype(state, constructorParent);
+    constructor->asFunctionObject()->setFunctionPrototype(state, proto);
+    constructor->asFunctionObject()->setHomeObject(proto);
+
+    if (heritagePresent) {
+        constructor->asFunctionObject()->setConstructorKind(FunctionObject::ConstructorKind::Derived);
+    }
+
+    proto->defineOwnProperty(state, state.context()->staticStrings().constructor, ObjectPropertyDescriptor(constructor, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::WritablePresent | ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::ValuePresent)));
+
+    registerFile[code->m_classRegisterIndex] = constructor;
+    registerFile[code->m_classPrototypeRegisterIndex] = proto;
+
+    ec->setOnGoingClassConstruction(true);
+}
+
+NEVER_INLINE void ByteCodeInterpreter::superOperation(ExecutionState& state, SuperReference* code, ExecutionContext* ec, Value* registerFile)
+{
+    if (code->m_isCall) {
+        Value newTarget = ec->getNewTarget();
+
+        if (newTarget.isUndefined()) {
+            // TODO ERR MSG
+            ErrorObject::throwBuiltinError(state, ErrorObject::TypeError, errorMessage_Class_Prototype_Is_Not_Object_Nor_Null);
+        }
+
+        registerFile[code->m_dstIndex] = ec->getSuperConstructor(state);
+        ec->setOnGoingSuperCall(true);
+    } else {
+        registerFile[code->m_dstIndex] = ec->makeSuperPropertyReference(state);
+    }
+}
+
 NEVER_INLINE Value ByteCodeInterpreter::withOperation(ExecutionState& state, WithOperation* code, Object* obj, ExecutionContext* ec, LexicalEnvironment* env, size_t& programCounter, ByteCodeBlock* byteCodeBlock, Value* registerFile, Value* stackStorage)
 {
     if (!state.ensureRareData()->m_controlFlowRecord) {
@@ -2112,7 +2252,9 @@ NEVER_INLINE void ByteCodeInterpreter::defineObjectGetter(ExecutionState& state,
     fn->defineOwnProperty(state, state.context()->staticStrings().name, ObjectPropertyDescriptor(builder.finalize()));
     JSGetterSetter gs(registerFile[code->m_objectPropertyValueRegisterIndex].asFunction(), Value(Value::EmptyValue));
     ObjectPropertyDescriptor desc(gs, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::EnumerablePresent));
-    registerFile[code->m_objectRegisterIndex].toObject(state)->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    Object* object = registerFile[code->m_objectRegisterIndex].toObject(state);
+    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    fn->setHomeObject(object);
 }
 
 NEVER_INLINE void ByteCodeInterpreter::defineObjectSetter(ExecutionState& state, ObjectDefineSetter* code, Value* registerFile)
@@ -2125,7 +2267,9 @@ NEVER_INLINE void ByteCodeInterpreter::defineObjectSetter(ExecutionState& state,
     fn->defineOwnProperty(state, state.context()->staticStrings().name, ObjectPropertyDescriptor(builder.finalize()));
     JSGetterSetter gs(Value(Value::EmptyValue), registerFile[code->m_objectPropertyValueRegisterIndex].asFunction());
     ObjectPropertyDescriptor desc(gs, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::EnumerablePresent));
-    registerFile[code->m_objectRegisterIndex].toObject(state)->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    Object* object = registerFile[code->m_objectRegisterIndex].toObject(state);
+    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    fn->setHomeObject(object);
 }
 
 NEVER_INLINE void ByteCodeInterpreter::processException(ExecutionState& state, const Value& value, ExecutionContext* ecInput, size_t programCounter)

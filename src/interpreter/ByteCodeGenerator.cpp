@@ -204,7 +204,14 @@ ByteCodeBlock* ByteCodeGenerator::generateByteCode(Context* c, InterpretedCodeBl
                 nd = nd->nextSilbing();
             }
             if (!(last && last->type() == ASTNodeType::ReturnStatement)) {
-                block->pushCode(ReturnFunction(ByteCodeLOC(SIZE_MAX)), &ctx, nullptr);
+                if (codeBlock->isClassConstructor()) {
+                    size_t idx = ctx.getRegister();
+                    block->pushCode(LoadThisBinding(ByteCodeLOC(SIZE_MAX), idx), &ctx, nullptr);
+                    block->pushCode(ReturnFunctionWithValue(ByteCodeLOC(SIZE_MAX), idx), &ctx, nullptr);
+                    ctx.giveUpRegister();
+                } else {
+                    block->pushCode(ReturnFunction(ByteCodeLOC(SIZE_MAX)), &ctx, nullptr);
+                }
             }
         }
     } catch (const ByteCodeGenerateError& err) {

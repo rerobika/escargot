@@ -44,11 +44,9 @@ struct NativeFunctionInfo {
     enum Flags {
         Strict = 1,
         Constructor = 1 << 1,
-        ClassConstructor = 1 << 2,
     };
     bool m_isStrict;
     bool m_isConstructor;
-    bool m_isClassConstructor;
     AtomicString m_name;
     NativeFunctionPointer m_nativeFunction;
     NativeFunctionConstructor m_nativeFunctionConstructor;
@@ -57,7 +55,6 @@ struct NativeFunctionInfo {
     NativeFunctionInfo(AtomicString name, NativeFunctionPointer fn, size_t argc, NativeFunctionConstructor ctor = nullptr, int flags = Flags::Strict | Flags::Constructor)
         : m_isStrict(flags & Strict)
         , m_isConstructor(flags & Constructor)
-        , m_isClassConstructor(flags & ClassConstructor)
         , m_name(name)
         , m_nativeFunction(fn)
         , m_nativeFunctionConstructor(ctor)

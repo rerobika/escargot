@@ -1135,6 +1135,16 @@ public:
                         return PassRefNode(this->finalize(node, new ThisExpressionNode()));
                     }
                     return ScanExpressionResult(ASTNodeType::ThisExpression, AtomicString());
+                } else if (this->matchKeyword(SuperKeyword)) {
+                    this->nextToken();
+                    if (!this->match(LeftParenthesis) && !this->match(Period) && !this->match(LeftSquareBracket)) {
+                        this->throwUnexpectedToken(this->lookahead);
+                    }
+
+                    if (isParse) {
+                        return PassRefNode(this->finalize(node, new SuperExpressionNode(this->lookahead->valuePunctuatorKind == LeftParenthesis)));
+                    }
+                    return ScanExpressionResult(ASTNodeType::SuperExpression, AtomicString());
                 } else if (this->matchKeyword(ClassKeyword)) {
                     if (isParse) {
                         return PassRefNode(this->parseClassExpression());
@@ -2366,12 +2376,13 @@ public:
         if (this->context->inFunctionBody && this->matchKeyword(SuperKeyword)) {
             MetaNode node = this->createNode();
             this->nextToken();
-            this->throwError("super keyword is not supported yet");
-            RELEASE_ASSERT_NOT_REACHED();
-            // expr = this->finalize(node, new Node.Super());
+
             if (!this->match(LeftParenthesis) && !this->match(Period) && !this->match(LeftSquareBracket)) {
                 this->throwUnexpectedToken(this->lookahead);
             }
+
+            insertUsingName(this->escargotContext->staticStrings().stringThis);
+            expr = this->finalize(node, new SuperExpressionNode(this->lookahead->valuePunctuatorKind == LeftParenthesis));
         } else if (this->matchKeyword(NewKeyword)) {
             expr = this->inheritCoverGrammar(&Parser::parseNewExpression);
         } else {
@@ -2425,9 +2436,7 @@ public:
         ScanExpressionResult expr(ASTNodeType::ASTNodeTypeError, AtomicString());
         if (this->context->inFunctionBody && this->matchKeyword(SuperKeyword)) {
             this->nextToken();
-            this->throwError("super keyword is not supported yet");
-            RELEASE_ASSERT_NOT_REACHED();
-            // expr = this->finalize(node, new Node.Super());
+            expr.first = ASTNodeType::SuperExpression;
             if (!this->match(LeftParenthesis) && !this->match(Period) && !this->match(LeftSquareBracket)) {
                 this->throwUnexpectedToken(this->lookahead);
             }
@@ -2495,10 +2504,7 @@ public:
             this->throwUnexpectedToken(this->lookahead);
         }
 
-        this->throwError("super keyword is not supported yet");
-        RELEASE_ASSERT_NOT_REACHED();
-        // return this->finalize(node, new Node.Super());
-        return nullptr;
+        return this->finalize(node, new SuperExpressionNode(false));
     }
 
     ScanExpressionResult scanSuper()
@@ -2510,10 +2516,7 @@ public:
             this->throwUnexpectedToken(this->lookahead);
         }
 
-        this->throwError("super keyword is not supported yet");
-        RELEASE_ASSERT_NOT_REACHED();
-        // return this->finalize(node, new Node.Super());
-        return ScanExpressionResult(ASTNodeType::ASTNodeTypeError, AtomicString());
+        return ScanExpressionResult(ASTNodeType::SuperExpression, AtomicString());
     }
 
     PassRefPtr<Node> parseLeftHandSideExpression()
@@ -6099,17 +6102,13 @@ public:
         return this->finalize(node, new ClassBodyNode(std::move(body), constructor));
     }
 
-    struct ClassProperty {
-        RefPtr<IdentifierNode> id;
-        RefPtr<ClassBodyNode> classBody;
-        RefPtr<Node> superClass;
-    };
-
-    ClassProperty parseClassProperties(bool identifierIsOptional)
+    template <class ClassType>
+    PassRefPtr<ClassType> parseClass(bool identifierIsOptional)
     {
         bool previousStrict = this->context->strict;
         this->context->strict = true;
         this->expectKeyword(ClassKeyword);
+        MetaNode node = this->createNode();
 
         RefPtr<IdentifierNode> id = (identifierIsOptional && this->lookahead->type != Token::IdentifierToken) ? nullptr : this->parseVariableIdentifier();
 
@@ -6120,7 +6119,6 @@ public:
 
         RefPtr<Node> superClass = nullptr;
         if (this->matchKeyword(ExtendsKeyword)) {
-            this->throwError("extends keyword is not supported yet");
             this->nextToken();
             superClass = this->isolateCoverGrammar(&Parser::parseLeftHandSideExpressionAllowCall);
         }
@@ -6128,21 +6126,18 @@ public:
         RefPtr<ClassBodyNode> classBody = this->parseClassBody();
         this->context->strict = previousStrict;
 
-        return ClassProperty{ id, classBody, superClass };
+
+        return this->finalize(node, new ClassType(id, superClass, classBody.get()));
     }
 
     PassRefPtr<ClassDeclarationNode> parseClassDeclaration()
     {
-        ClassProperty classProperties = parseClassProperties(false);
-
-        return this->finalize(this->createNode(), new ClassDeclarationNode(classProperties.id, classProperties.superClass, classProperties.classBody.get(), this->escargotContext));
+        return parseClass<ClassDeclarationNode>(false);
     }
 
     PassRefPtr<ClassExpressionNode> parseClassExpression()
     {
-        ClassProperty classProperties = parseClassProperties(true);
-
-        return this->finalize(this->createNode(), new ClassExpressionNode(classProperties.id, classProperties.superClass, classProperties.classBody.get(), this->escargotContext));
+        return parseClass<ClassExpressionNode>(true);
     }
 
     // ECMA-262 15.1 Scripts

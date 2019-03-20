@@ -138,6 +138,7 @@ enum ASTNodeType {
     ClassBody,
     ClassElement,
     ClassMethod,
+    SuperExpression,
 };
 
 struct NodeLOC {
@@ -235,6 +236,11 @@ public:
     bool isMemberExpression()
     {
         return type() == ASTNodeType::MemberExpression;
+    }
+
+    bool isSuperNode()
+    {
+        return type() == ASTNodeType::SuperExpression;
     }
 
     virtual bool isExpressionNode()
