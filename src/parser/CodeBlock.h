@@ -438,6 +438,11 @@ public:
         return false;
     }
 
+    bool shouldReparseArguments()
+    {
+        return m_shouldReparseArguments;
+    }
+
     IndexedIdentifierInfo upperIndexedIdentifierInfo(const AtomicString& name)
     {
         size_t upperIndex = 1;
@@ -547,9 +552,19 @@ public:
         return m_src;
     }
 
+    const StringView& paramsSrc()
+    {
+        return m_paramsSrc;
+    }
+
     ExtendedNodeLOC sourceElementStart()
     {
         return m_sourceElementStart;
+    }
+
+    ExtendedNodeLOC paramsStart()
+    {
+        return m_paramsStart;
     }
 
 #ifndef NDEBUG
@@ -584,8 +599,11 @@ protected:
     InterpretedCodeBlock(Context* ctx, Script* script, StringView src, ASTScopeContext* scopeCtx, ExtendedNodeLOC sourceElementStart, InterpretedCodeBlock* parentBlock);
 
     Script* m_script;
+    StringView m_paramsSrc; // function parameters elements src
     StringView m_src; // function source elements src
     ExtendedNodeLOC m_sourceElementStart;
+    ExtendedNodeLOC m_paramsStart;
+    bool m_shouldReparseArguments : 1;
 
     FunctionParametersInfoVector m_parametersInfomation;
     uint16_t m_identifierOnStackCount;
