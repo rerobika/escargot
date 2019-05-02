@@ -344,25 +344,34 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 NEXT_INSTRUCTION();
             }
 
+            DEFINE_OPCODE(ToNumberIncrement)
+                :
+            {
+                ToNumberIncrement* code = (ToNumberIncrement*)programCounter;
+                Value toNumberValue = Value(registerFile[code->m_srcIndex].toNumber(state));
+                registerFile[code->m_dstIndex] = toNumberValue;
+                registerFile[code->m_storeIndex] = incrementOperation(state, toNumberValue);
+                ADD_PROGRAM_COUNTER(ToNumberIncrement);
+                NEXT_INSTRUCTION();
+            }
+
             DEFINE_OPCODE(Increment)
                 :
             {
                 Increment* code = (Increment*)programCounter;
-                const Value& val = registerFile[code->m_srcIndex];
-                if (LIKELY(val.isInt32())) {
-                    int32_t a = val.asInt32();
-                    int32_t b = 1;
-                    int32_t c;
-                    bool result = ArithmeticOperations<int32_t, int32_t, int32_t>::add(a, b, c);
-                    if (LIKELY(result)) {
-                        registerFile[code->m_dstIndex] = Value(c);
-                    } else {
-                        registerFile[code->m_dstIndex] = Value(Value::EncodeAsDouble, (double)a + (double)b);
-                    }
-                } else {
-                    registerFile[code->m_dstIndex] = plusSlowCase(state, Value(val.toNumber(state)), Value(1));
-                }
+                registerFile[code->m_dstIndex] = incrementOperation(state, registerFile[code->m_srcIndex]);
                 ADD_PROGRAM_COUNTER(Increment);
+                NEXT_INSTRUCTION();
+            }
+
+            DEFINE_OPCODE(ToNumberDecrement)
+                :
+            {
+                ToNumberDecrement* code = (ToNumberDecrement*)programCounter;
+                Value toNumberValue = Value(registerFile[code->m_srcIndex].toNumber(state));
+                registerFile[code->m_dstIndex] = toNumberValue;
+                registerFile[code->m_storeIndex] = decrementOperation(state, toNumberValue);
+                ADD_PROGRAM_COUNTER(ToNumberDecrement);
                 NEXT_INSTRUCTION();
             }
 
@@ -370,20 +379,7 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 :
             {
                 Decrement* code = (Decrement*)programCounter;
-                const Value& val = registerFile[code->m_srcIndex];
-                if (LIKELY(val.isInt32())) {
-                    int32_t a = val.asInt32();
-                    int32_t b = -1;
-                    int32_t c;
-                    bool result = ArithmeticOperations<int32_t, int32_t, int32_t>::add(a, b, c);
-                    if (LIKELY(result)) {
-                        registerFile[code->m_dstIndex] = Value(c);
-                    } else {
-                        registerFile[code->m_dstIndex] = Value(Value::EncodeAsDouble, (double)a + (double)b);
-                    }
-                } else {
-                    registerFile[code->m_dstIndex] = Value(val.toNumber(state) - 1);
-                }
+                registerFile[code->m_dstIndex] = decrementOperation(state, registerFile[code->m_srcIndex]);
                 ADD_PROGRAM_COUNTER(Decrement);
                 NEXT_INSTRUCTION();
             }
@@ -2262,6 +2258,40 @@ NEVER_INLINE void ByteCodeInterpreter::defineObjectSetter(ExecutionState& state,
     JSGetterSetter gs(Value(Value::EmptyValue), registerFile[code->m_objectPropertyValueRegisterIndex].asFunction());
     ObjectPropertyDescriptor desc(gs, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::EnumerablePresent));
     registerFile[code->m_objectRegisterIndex].toObject(state)->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+}
+
+ALWAYS_INLINE Value ByteCodeInterpreter::incrementOperation(ExecutionState& state, const Value& value)
+{
+    if (LIKELY(value.isInt32())) {
+        int32_t a = value.asInt32();
+        int32_t b = 1;
+        int32_t c;
+        bool result = ArithmeticOperations<int32_t, int32_t, int32_t>::add(a, b, c);
+        if (LIKELY(result)) {
+            return Value(c);
+        } else {
+            return Value(Value::EncodeAsDouble, (double)a + (double)b);
+        }
+    } else {
+        return plusSlowCase(state, Value(value.toNumber(state)), Value(1));
+    }
+}
+
+ALWAYS_INLINE Value ByteCodeInterpreter::decrementOperation(ExecutionState& state, const Value& value)
+{
+    if (LIKELY(value.isInt32())) {
+        int32_t a = value.asInt32();
+        int32_t b = -1;
+        int32_t c;
+        bool result = ArithmeticOperations<int32_t, int32_t, int32_t>::add(a, b, c);
+        if (LIKELY(result)) {
+            return Value(c);
+        } else {
+            return Value(Value::EncodeAsDouble, (double)a + (double)b);
+        }
+    } else {
+        return Value(value.toNumber(state) - 1);
+    }
 }
 
 NEVER_INLINE void ByteCodeInterpreter::processException(ExecutionState& state, const Value& value, ExecutionContext* ecInput, size_t programCounter)

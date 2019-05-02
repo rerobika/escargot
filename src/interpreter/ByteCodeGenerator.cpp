@@ -397,6 +397,14 @@ ByteCodeBlock* ByteCodeGenerator::generateByteCode(Context* c, InterpretedCodeBl
                 assignStackIndexIfNeeded(cd->m_dstIndex, stackBase, stackBaseWillBe, stackVariableSize);
                 break;
             }
+            case ToNumberIncrementOpcode:
+            case ToNumberDecrementOpcode: {
+                ToNumberIncrement* cd = (ToNumberIncrement*)currentCode;
+                assignStackIndexIfNeeded(cd->m_srcIndex, stackBase, stackBaseWillBe, stackVariableSize);
+                assignStackIndexIfNeeded(cd->m_dstIndex, stackBase, stackBaseWillBe, stackVariableSize);
+                assignStackIndexIfNeeded(cd->m_storeIndex, stackBase, stackBaseWillBe, stackVariableSize);
+                break;
+            }
             case UnaryTypeofOpcode: {
                 UnaryTypeof* cd = (UnaryTypeof*)currentCode;
                 assignStackIndexIfNeeded(cd->m_srcIndex, stackBase, stackBaseWillBe, stackVariableSize);

@@ -79,6 +79,8 @@ class Node;
     F(Move, 1, 0)                                     \
     F(Increment, 1, 1)                                \
     F(Decrement, 1, 1)                                \
+    F(ToNumberIncrement, 2, 2)                        \
+    F(ToNumberDecrement, 2, 2)                        \
     F(ToNumber, 1, 1)                                 \
     F(UnaryMinus, 1, 1)                               \
     F(UnaryNot, 1, 1)                                 \
@@ -829,6 +831,28 @@ public:
 #endif
 };
 
+class ToNumberIncrement : public ByteCode {
+public:
+    ToNumberIncrement(const ByteCodeLOC& loc, const size_t srcIndex, const size_t storeIndex, const size_t dstIndex)
+        : ByteCode(Opcode::ToNumberIncrementOpcode, loc)
+        , m_srcIndex(srcIndex)
+        , m_storeIndex(storeIndex)
+        , m_dstIndex(dstIndex)
+    {
+    }
+
+    ByteCodeRegisterIndex m_srcIndex;
+    ByteCodeRegisterIndex m_storeIndex;
+    ByteCodeRegisterIndex m_dstIndex;
+
+#ifndef NDEBUG
+    void dump(const char* byteCodeStart)
+    {
+        printf("to number increment(r%d) -> r%d, r%d", (int)m_srcIndex, (int)m_storeIndex, (int)m_dstIndex);
+    }
+#endif
+};
+
 class Decrement : public ByteCode {
 public:
     Decrement(const ByteCodeLOC& loc, const size_t srcIndex, const size_t dstIndex)
@@ -845,6 +869,28 @@ public:
     void dump(const char* byteCodeStart)
     {
         printf("decrement r%d <- r%d", (int)m_dstIndex, (int)m_srcIndex);
+    }
+#endif
+};
+
+class ToNumberDecrement : public ByteCode {
+public:
+    ToNumberDecrement(const ByteCodeLOC& loc, const size_t srcIndex, const size_t storeIndex, const size_t dstIndex)
+        : ByteCode(Opcode::ToNumberDecrementOpcode, loc)
+        , m_srcIndex(srcIndex)
+        , m_storeIndex(storeIndex)
+        , m_dstIndex(dstIndex)
+    {
+    }
+
+    ByteCodeRegisterIndex m_srcIndex;
+    ByteCodeRegisterIndex m_storeIndex;
+    ByteCodeRegisterIndex m_dstIndex;
+
+#ifndef NDEBUG
+    void dump(const char* byteCodeStart)
+    {
+        printf("to number decrement(r%d) -> r%d, r%d", (int)m_srcIndex, (int)m_storeIndex, (int)m_dstIndex);
     }
 #endif
 };
