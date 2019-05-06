@@ -468,6 +468,20 @@ ByteCodeBlock* ByteCodeGenerator::generateByteCode(Context* c, InterpretedCodeBl
                 assignStackIndexIfNeeded(cd->m_registerIndex, stackBase, stackBaseWillBe, stackVariableSize);
                 break;
             }
+            case JumpIfRelationOpcode: {
+                JumpIfRelation* cd = (JumpIfRelation*)currentCode;
+                cd->m_jumpPosition = cd->m_jumpPosition + codeBase;
+                assignStackIndexIfNeeded(cd->m_registerIndex0, stackBase, stackBaseWillBe, stackVariableSize);
+                assignStackIndexIfNeeded(cd->m_registerIndex1, stackBase, stackBaseWillBe, stackVariableSize);
+                break;
+            }
+            case JumpIfEqualOpcode: {
+                JumpIfEqual* cd = (JumpIfEqual*)currentCode;
+                cd->m_jumpPosition = cd->m_jumpPosition + codeBase;
+                assignStackIndexIfNeeded(cd->m_registerIndex0, stackBase, stackBaseWillBe, stackVariableSize);
+                assignStackIndexIfNeeded(cd->m_registerIndex1, stackBase, stackBaseWillBe, stackVariableSize);
+                break;
+            }
             case ThrowOperationOpcode: {
                 ThrowOperation* cd = (ThrowOperation*)currentCode;
                 assignStackIndexIfNeeded(cd->m_registerIndex, stackBase, stackBaseWillBe, stackVariableSize);

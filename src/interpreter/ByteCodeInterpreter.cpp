@@ -495,6 +495,50 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 NEXT_INSTRUCTION();
             }
 
+            DEFINE_OPCODE(JumpIfRelation)
+                :
+            {
+                JumpIfRelation* code = (JumpIfRelation*)programCounter;
+                ASSERT(code->m_jumpPosition != SIZE_MAX);
+                const Value& left = registerFile[code->m_registerIndex0];
+                const Value& right = registerFile[code->m_registerIndex1];
+                bool relation;
+                if (code->m_isEqual) {
+                    relation = abstractRelationalComparisonOrEqual(state, left, right, code->m_isLeftFirst);
+                } else {
+                    relation = abstractRelationalComparison(state, left, right, code->m_isLeftFirst);
+                }
+
+                if (relation ^ code->m_jumpIf) {
+                    ADD_PROGRAM_COUNTER(JumpIfRelation);
+                } else {
+                    programCounter = code->m_jumpPosition;
+                }
+                NEXT_INSTRUCTION();
+            }
+
+            DEFINE_OPCODE(JumpIfEqual)
+                :
+            {
+                JumpIfEqual* code = (JumpIfEqual*)programCounter;
+                ASSERT(code->m_jumpPosition != SIZE_MAX);
+                const Value& left = registerFile[code->m_registerIndex0];
+                const Value& right = registerFile[code->m_registerIndex1];
+                bool equality;
+                if (code->m_isStrict) {
+                    equality = left.equalsTo(state, right);
+                } else {
+                    equality = left.abstractEqualsTo(state, right);
+                }
+
+                if (equality ^ code->m_shouldNegate) {
+                    ADD_PROGRAM_COUNTER(JumpIfEqual);
+                } else {
+                    programCounter = code->m_jumpPosition;
+                }
+                NEXT_INSTRUCTION();
+            }
+
             DEFINE_OPCODE(JumpIfTrue)
                 :
             {

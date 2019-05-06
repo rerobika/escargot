@@ -90,24 +90,25 @@ enum ASTNodeType {
     BinaryExpressionBitwiseOr,
     BinaryExpressionBitwiseXor,
     BinaryExpressionDivison,
+    /* Note: These 8 types must be in this order */
     BinaryExpressionEqual,
+    BinaryExpressionNotEqual,
+    BinaryExpressionStrictEqual,
+    BinaryExpressionNotStrictEqual,
     BinaryExpressionGreaterThan,
     BinaryExpressionGreaterThanOrEqual,
+    BinaryExpressionLessThan,
+    BinaryExpressionLessThanOrEqual,
     BinaryExpressionIn,
     BinaryExpressionInstanceOf,
     BinaryExpressionLeftShift,
-    BinaryExpressionLessThan,
-    BinaryExpressionLessThanOrEqual,
     BinaryExpressionLogicalAnd,
     BinaryExpressionLogicalOr,
     BinaryExpressionMinus,
     BinaryExpressionMod,
     BinaryExpressionMultiply,
-    BinaryExpressionNotEqual,
-    BinaryExpressionNotStrictEqual,
     BinaryExpressionPlus,
     BinaryExpressionSignedRightShift,
-    BinaryExpressionStrictEqual,
     BinaryExpressionUnsignedRightShift,
     LogicalExpression,
     UpdateExpressionDecrementPostfix,
@@ -199,6 +200,16 @@ public:
     inline void operator delete(void *obj)
     {
         GC_FREE(obj);
+    }
+
+    bool isRelationOperation()
+    {
+        return type() >= ASTNodeType::BinaryExpressionGreaterThan && type() <= ASTNodeType::BinaryExpressionLessThanOrEqual;
+    }
+
+    bool isEqualityOperation()
+    {
+        return type() >= ASTNodeType::BinaryExpressionEqual && type() <= ASTNodeType::BinaryExpressionNotStrictEqual;
     }
 
     bool isIdentifier()

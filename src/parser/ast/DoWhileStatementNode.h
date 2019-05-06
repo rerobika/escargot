@@ -46,14 +46,27 @@ public:
 
         size_t doStart = codeBlock->currentCodeSize();
         m_body->generateStatementByteCode(codeBlock, &newContext);
+        size_t testPos = codeBlock->currentCodeSize();
 
         newContext.getRegister(); // ExeuctionResult of m_body should not be overwritten by m_test
-        size_t testPos = codeBlock->currentCodeSize();
-        size_t testReg = m_test->getRegister(codeBlock, &newContext);
-        m_test->generateExpressionByteCode(codeBlock, &newContext, testReg);
-        codeBlock->pushCode(JumpIfTrue(ByteCodeLOC(m_loc.index), testReg, doStart), &newContext, this);
-
-        newContext.giveUpRegister();
+        if (m_test->isRelationOperation()) {
+            m_test->generateExpressionByteCode(codeBlock, &newContext, REGISTER_LIMIT);
+            size_t jPos = codeBlock->lastCodePosition<JumpIfEqual>();
+            JumpIfRelation *j = codeBlock->peekCode<JumpIfRelation>(jPos);
+            j->m_jumpPosition = doStart;
+            j->m_jumpIf = true;
+        } else if (m_test->isEqualityOperation()) {
+            m_test->generateExpressionByteCode(codeBlock, &newContext, REGISTER_LIMIT);
+            size_t jPos = codeBlock->lastCodePosition<JumpIfEqual>();
+            JumpIfEqual *j = codeBlock->peekCode<JumpIfEqual>(jPos);
+            j->m_jumpPosition = doStart;
+            j->m_shouldNegate = !j->m_shouldNegate;
+        } else {
+            size_t testReg = m_test->getRegister(codeBlock, &newContext);
+            m_test->generateExpressionByteCode(codeBlock, &newContext, testReg);
+            codeBlock->pushCode(JumpIfTrue(ByteCodeLOC(m_loc.index), testReg, doStart), &newContext, this);
+            newContext.giveUpRegister();
+        }
         newContext.giveUpRegister();
 
         size_t doEnd = codeBlock->currentCodeSize();
