@@ -86,7 +86,12 @@ public:
         if (isPreComputedCase()) {
             ASSERT(m_property->isIdentifier());
             size_t pos = codeBlock->currentCodeSize();
-            codeBlock->pushCode(GetObjectPreComputedCase(ByteCodeLOC(m_loc.index), objectIndex, dstIndex, m_property->asIdentifier()->name()), context, this);
+            AtomicString propName = m_property->asIdentifier()->name();
+            if (propName.string()->equals("length")) {
+                codeBlock->pushCode(GetLength(ByteCodeLOC(m_loc.index), objectIndex, dstIndex, propName), context, this);
+            } else {
+                codeBlock->pushCode(GetObjectPreComputedCase(ByteCodeLOC(m_loc.index), objectIndex, dstIndex, propName), context, this);
+            }
             context->m_getObjectCodePositions.push_back(pos);
         } else {
             size_t propertyIndex = m_property->getRegister(codeBlock, context);

@@ -505,6 +505,32 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                 NEXT_INSTRUCTION();
             }
 
+            DEFINE_OPCODE(GetLength)
+                :
+            {
+                GetLength* code = (GetLength*)programCounter;
+                const Value& base = registerFile[code->m_objectRegisterIndex];
+                Object* obj;
+                if (base.isString()) {
+                    registerFile[code->m_storeRegisterIndex] = Value(base.asString()->length());
+                    ADD_PROGRAM_COUNTER(GetLength);
+                    NEXT_INSTRUCTION();
+                } else if (base.isObject()) {
+                    obj = base.asObject();
+                    if (obj->isArrayObject()) {
+                        registerFile[code->m_storeRegisterIndex] = obj->asArrayObject()->arrayLength();
+                        ADD_PROGRAM_COUNTER(GetLength);
+                        NEXT_INSTRUCTION();
+                    }
+                } else {
+                    obj = fastToObject(state, base);
+                }
+
+                registerFile[code->m_storeRegisterIndex] = getObjectPrecomputedCaseOperation(state, obj, base, code->m_propertyName, code->m_inlineCache, byteCodeBlock);
+                ADD_PROGRAM_COUNTER(GetLength);
+                NEXT_INSTRUCTION();
+            }
+
             DEFINE_OPCODE(SetObjectPreComputedCase)
                 :
             {

@@ -80,6 +80,7 @@ struct GlobalVariableAccessCacheItem;
     F(SetObjectOperation, 0, 2)                       \
     F(GetObjectPreComputedCase, 1, 1)                 \
     F(SetObjectPreComputedCase, 0, 1)                 \
+    F(GetLength, 1, 1)                                \
     F(GetGlobalVariable, 1, 1)                        \
     F(SetGlobalVariable, 0, 1)                        \
     F(InitializeGlobalVariable, 0, 1)                 \
@@ -875,6 +876,28 @@ public:
     void dump(const char* byteCodeStart)
     {
         printf("set object r%d.%s <- r%d", (int)m_objectRegisterIndex, m_propertyName.plainString()->toUTF8StringData().data(), (int)m_loadRegisterIndex);
+    }
+#endif
+};
+
+class GetLength : public ByteCode {
+public:
+    GetLength(const ByteCodeLOC& loc, const size_t objectRegisterIndex, const size_t storeRegisterIndex, PropertyName propertyName)
+        : ByteCode(Opcode::GetLengthOpcode, loc)
+        , m_objectRegisterIndex(objectRegisterIndex)
+        , m_storeRegisterIndex(storeRegisterIndex)
+        , m_propertyName(propertyName)
+    {
+    }
+
+    GetObjectInlineCache m_inlineCache;
+    ByteCodeRegisterIndex m_objectRegisterIndex;
+    ByteCodeRegisterIndex m_storeRegisterIndex;
+    PropertyName m_propertyName;
+#ifndef NDEBUG
+    void dump(const char* byteCodeStart)
+    {
+        printf("get length r%d <- r%d", (int)m_storeRegisterIndex, (int)m_objectRegisterIndex);
     }
 #endif
 };

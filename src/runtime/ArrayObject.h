@@ -64,6 +64,12 @@ public:
     {
         return getArrayLength(state);
     }
+
+    Value arrayLength()
+    {
+        return m_values[ESCARGOT_OBJECT_BUILTIN_PROPERTY_NUMBER];
+    }
+
     virtual void sort(ExecutionState& state, const std::function<bool(const Value& a, const Value& b)>& comp) override;
     virtual ObjectGetResult getIndexedProperty(ExecutionState& state, const Value& property) override;
     virtual bool setIndexedProperty(ExecutionState& state, const Value& property, const Value& value) override;

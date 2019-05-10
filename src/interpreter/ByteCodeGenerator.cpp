@@ -340,6 +340,12 @@ ByteCodeBlock* ByteCodeGenerator::generateByteCode(Context* c, InterpretedCodeBl
                 assignStackIndexIfNeeded(cd->m_storeRegisterIndex, stackBase, stackBaseWillBe, stackVariableSize);
                 break;
             }
+            case GetLengthOpcode: {
+                GetLength* cd = (GetLength*)currentCode;
+                assignStackIndexIfNeeded(cd->m_objectRegisterIndex, stackBase, stackBaseWillBe, stackVariableSize);
+                assignStackIndexIfNeeded(cd->m_storeRegisterIndex, stackBase, stackBaseWillBe, stackVariableSize);
+                break;
+            }
             case SetObjectPreComputedCaseOpcode: {
                 SetObjectPreComputedCase* cd = (SetObjectPreComputedCase*)currentCode;
                 assignStackIndexIfNeeded(cd->m_objectRegisterIndex, stackBase, stackBaseWillBe, stackVariableSize);
