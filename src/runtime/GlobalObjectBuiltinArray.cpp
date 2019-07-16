@@ -630,7 +630,7 @@ static Value builtinArrayConcat(ExecutionState& state, Value thisValue, size_t a
                 // Let k be 0.
                 uint64_t k = 0;
                 // Let len be the result of calling the [[Get]] internal method of E with argument "length".
-                uint64_t len = arr->length(state);
+                double len = arr->get(state, ObjectPropertyName(state.context()->staticStrings().length)).value(state, arr).toLength(state);
 
                 // If n + len > 2^53 - 1, throw a TypeError exception.
                 CHECK_ARRAY_LENGTH(n + len, (1ULL << 53));

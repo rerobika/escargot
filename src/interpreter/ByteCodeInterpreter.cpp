@@ -2635,15 +2635,15 @@ NEVER_INLINE void ByteCodeInterpreter::defineObjectGetter(ExecutionState& state,
 {
     // FIXME: FunctionObject
     FunctionObject* fn = registerFile[code->m_objectPropertyValueRegisterIndex].asFunction();
-    String* pName = registerFile[code->m_objectPropertyNameRegisterIndex].toString(state);
+    ObjectPropertyName pName(state, registerFile[code->m_objectPropertyNameRegisterIndex]);
     StringBuilder builder;
     builder.appendString("get ");
-    builder.appendString(pName);
+    builder.appendString(pName.toExceptionString());
     fn->defineOwnProperty(state, state.context()->staticStrings().name, ObjectPropertyDescriptor(builder.finalize()));
     JSGetterSetter gs(registerFile[code->m_objectPropertyValueRegisterIndex].asFunction(), Value(Value::EmptyValue));
     ObjectPropertyDescriptor desc(gs, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::EnumerablePresent));
     Object* object = registerFile[code->m_objectRegisterIndex].toObject(state);
-    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, pName, desc);
     fn->setHomeObject(object);
 }
 
@@ -2651,15 +2651,15 @@ NEVER_INLINE void ByteCodeInterpreter::defineObjectSetter(ExecutionState& state,
 {
     // FIXME: FunctionObject
     FunctionObject* fn = registerFile[code->m_objectPropertyValueRegisterIndex].asFunction();
-    String* pName = registerFile[code->m_objectPropertyNameRegisterIndex].toString(state);
+    ObjectPropertyName pName(state, registerFile[code->m_objectPropertyNameRegisterIndex]);
     StringBuilder builder;
     builder.appendString("set ");
-    builder.appendString(pName);
+    builder.appendString(pName.toExceptionString());
     fn->defineOwnProperty(state, state.context()->staticStrings().name, ObjectPropertyDescriptor(builder.finalize()));
     JSGetterSetter gs(Value(Value::EmptyValue), registerFile[code->m_objectPropertyValueRegisterIndex].asFunction());
     ObjectPropertyDescriptor desc(gs, (ObjectPropertyDescriptor::PresentAttribute)(ObjectPropertyDescriptor::ConfigurablePresent | ObjectPropertyDescriptor::EnumerablePresent));
     Object* object = registerFile[code->m_objectRegisterIndex].toObject(state);
-    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, ObjectPropertyName(state, pName), desc);
+    object->defineOwnPropertyThrowsExceptionWhenStrictMode(state, pName, desc);
     fn->setHomeObject(object);
 }
 
