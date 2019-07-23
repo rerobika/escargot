@@ -76,7 +76,7 @@ public:
             AtomicString propertyAtomicName;
             bool hasKey = false;
             size_t propertyIndex = SIZE_MAX;
-            if (p->key()->isIdentifier() && !p->computed()) {
+            if (p->key()->isIdentifier() && !p->computed() && p->key()->asIdentifier()->name() != codeBlock->m_codeBlock->context()->staticStrings().__proto__) {
                 if (p->kind() == PropertyNode::Kind::Init) {
                     // skip
                     propertyAtomicName = p->key()->asIdentifier()->name();

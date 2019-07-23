@@ -444,13 +444,16 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
                     ArrayObject* arr = (ArrayObject*)v;
                     if (LIKELY(arr->isFastModeArray())) {
                         uint32_t idx = property.tryToUseAsArrayIndex(state);
-                        if (LIKELY(idx != Value::InvalidArrayIndexValue) && LIKELY(idx < arr->getArrayLength(state))) {
-                            const Value& v = arr->m_fastModeData[idx];
-                            if (LIKELY(!v.isEmpty())) {
-                                registerFile[code->m_storeRegisterIndex] = v;
-                                ADD_PROGRAM_COUNTER(GetObject);
-                                NEXT_INSTRUCTION();
+                        if (LIKELY(idx != Value::InvalidArrayIndexValue)) {
+                            if (LIKELY(idx < arr->getArrayLength(state))) {
+                                const Value& v = arr->m_fastModeData[idx];
+                                registerFile[code->m_storeRegisterIndex] = v.isEmpty() ? Value() : v;
+                            } else {
+                                registerFile[code->m_storeRegisterIndex] = Value();
                             }
+
+                            ADD_PROGRAM_COUNTER(GetObject);
+                            NEXT_INSTRUCTION();
                         }
                     }
                 }
@@ -817,12 +820,7 @@ Value ByteCodeInterpreter::interpret(ExecutionState& state, ByteCodeBlock* byteC
             {
                 ObjectDefineOwnPropertyWithNameOperation* code = (ObjectDefineOwnPropertyWithNameOperation*)programCounter;
                 const Value& willBeObject = registerFile[code->m_objectRegisterIndex];
-                // http://www.ecma-international.org/ecma-262/6.0/#sec-__proto__-property-names-in-object-initializers
-                if (code->m_propertyName == state.context()->staticStrings().__proto__) {
-                    willBeObject.asObject()->setPrototype(state, registerFile[code->m_loadRegisterIndex]);
-                } else {
-                    willBeObject.asObject()->defineOwnProperty(state, ObjectPropertyName(code->m_propertyName), ObjectPropertyDescriptor(registerFile[code->m_loadRegisterIndex], code->m_presentAttribute));
-                }
+                willBeObject.asObject()->defineOwnProperty(state, ObjectPropertyName(state, code->m_propertyName), ObjectPropertyDescriptor(registerFile[code->m_loadRegisterIndex], code->m_presentAttribute));
                 ADD_PROGRAM_COUNTER(ObjectDefineOwnPropertyWithNameOperation);
                 NEXT_INSTRUCTION();
             }
